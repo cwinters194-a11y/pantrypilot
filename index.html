@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PantryPilot V3.5</title>
+
+  <title>PantryPilot V3.6</title>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
@@ -16,7 +17,7 @@
     }
 
     header {
-      background: #ffffff;
+      background: white;
       padding: 20px;
       border-bottom: 1px solid #ddd;
       position: sticky;
@@ -36,7 +37,7 @@
 
     main {
       max-width: 800px;
-      margin: 0 auto;
+      margin: auto;
       padding: 20px;
     }
 
@@ -45,7 +46,7 @@
       border-radius: 14px;
       padding: 18px;
       margin-bottom: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
     }
 
     button {
@@ -62,10 +63,6 @@
     button.secondary {
       background: #e8e8e8;
       color: #222;
-    }
-
-    button.danger {
-      background: #b3261e;
     }
 
     input[type="file"] {
@@ -95,7 +92,7 @@
       border-radius: 12px;
       padding: 14px;
       margin: 10px 0;
-      background: #fff;
+      background: white;
     }
 
     .item-header {
@@ -230,20 +227,14 @@
 
 
   <section>
-
     <h2>Pantry</h2>
-
     <div id="pantryList"></div>
-
   </section>
 
 
   <section>
-
     <h2>Use Soon</h2>
-
     <div id="useSoonList"></div>
-
   </section>
 
 </main>
@@ -279,11 +270,11 @@ const PRODUCT_FAMILIES = [
       "grillers burger",
       "grillers",
       "griller burger",
-      "rlllers burgr",
-      "rillers burgr",
+      "rlllers burger",
+      "rillers burger",
+      "meaty grillers burger",
       "meaty rlllers burgr",
-      "meat rillers burgr",
-      "meaty grillers burger"
+      "meat rillers burgr"
     ]
   },
 
@@ -293,12 +284,12 @@ const PRODUCT_FAMILIES = [
     aliases: [
       "meatless crumbles",
       "meatless crumble",
+      "meatless crundles",
       "crumbles",
-      "crumbles",
+      "crumble",
       "chicken crumbles",
       "chicks crumbles",
       "chrcress crumbles",
-      "chrcress crmbles",
       "porumbles",
       "chicken porumbles"
     ]
@@ -310,6 +301,8 @@ const PRODUCT_FAMILIES = [
     aliases: [
       "chicken patties",
       "chicken patty",
+      "chicken patics",
+      "chicken patyics",
       "chkn patties",
       "chicken pattie",
       "chkn patty"
@@ -333,6 +326,7 @@ const PRODUCT_FAMILIES = [
     name: "Fever-Tree Ginger Beer",
     shelfLife: 30,
     aliases: [
+      "fever tree ginger",
       "fever tree ginger beer",
       "fever-tree ginger beer",
       "fevertree ginger beer",
@@ -346,10 +340,12 @@ const PRODUCT_FAMILIES = [
     shelfLife: 90,
     aliases: [
       "beer",
-      "beer 8 pack",
+      "beer 6pk",
+      "beer 6 pk",
       "beer 8pk",
-      "beer 12 pack",
-      "beer 12pk"
+      "beer 8 pack",
+      "beer 12pk",
+      "beer 12 pack"
     ]
   },
 
@@ -373,6 +369,7 @@ const PRODUCT_FAMILIES = [
       "hidden valley",
       "hddn valley ranch",
       "hddn vly ranch",
+      "odn vly ranch",
       "ranch dressing",
       "ranch"
     ]
@@ -421,27 +418,27 @@ const PRODUCT_FAMILIES = [
 
 
 /* ============================================================
-   DEPARTMENT / NON-PRODUCT FILTERS
+   RECEIPT / NON-PRODUCT TERMS
    ============================================================ */
 
-const DEPARTMENT_LINES = [
-  "frozen foods",
-  "frozen food",
-  "grocery",
-  "produce",
-  "deli",
-  "bakery",
-  "seafood",
-  "meat department",
-  "meat",
+const NON_PRODUCT_TERMS = [
+
   "subtotal",
   "sub total",
   "total",
   "tax",
-  "change",
-  "cash",
+  "mn state tax",
+  "minnesota state tax",
+  "hennepin cnty",
+  "hennepin county",
+  "edina city tax",
+  "city tax",
+  "county tax",
+  "state tax",
+
   "credit",
   "debit",
+  "cash",
   "visa",
   "mastercard",
   "master card",
@@ -450,6 +447,20 @@ const DEPARTMENT_LINES = [
   "payment",
   "tender",
   "balance",
+  "card",
+  "card information",
+
+  "non merch sales",
+  "non merchandise sales",
+  "non merch",
+  "merch sales",
+
+  "number of items",
+  "number of tems",
+  "items in",
+  "thank you",
+  "thanks for shopping",
+
   "savings",
   "coupon",
   "discount",
@@ -459,11 +470,19 @@ const DEPARTMENT_LINES = [
   "transaction",
   "approval",
   "authorization",
-  "card",
-  "bag",
+
   "bag fee",
   "fuel",
-  "gas"
+  "gas",
+
+  "frozen foods",
+  "frozen food",
+  "grocery",
+  "produce",
+  "deli",
+  "bakery",
+  "seafood",
+  "meat department"
 ];
 
 
@@ -472,6 +491,7 @@ const DEPARTMENT_LINES = [
    ============================================================ */
 
 const GROCERY_WORDS = [
+
   "cheese",
   "cheddar",
   "burger",
@@ -530,16 +550,12 @@ let rawOCRText = "";
 
 
 /* ============================================================
-   OCR NORMALIZATION
+   NORMALIZE OCR
    ============================================================ */
 
 function normalizeOCR(text) {
 
   let s = String(text || "").toLowerCase();
-
-  /*
-   * Common OCR substitutions.
-   */
 
   const replacements = [
 
@@ -555,9 +571,8 @@ function normalizeOCR(text) {
     [/\brillers\b/g, "grillers"],
 
     [/\bburgr\b/g, "burger"],
-    [/\bbur?ger\b/g, "burger"],
 
-    [/\bcrmbles\b/g, "crumbles"],
+    [/\bcrundles\b/g, "crumbles"],
     [/\bcrmbles\b/g, "crumbles"],
     [/\bcrumbl(?:e)?s\b/g, "crumbles"],
     [/\brumbles\b/g, "crumbles"],
@@ -565,11 +580,11 @@ function normalizeOCR(text) {
 
     [/\bchkn\b/g, "chicken"],
     [/\bchicks\b/g, "chicken"],
-    [/\bchick(?:e)?n\b/g, "chicken"],
 
+    [/\bpatyics\b/g, "patties"],
+    [/\bpattics\b/g, "patties"],
     [/\bpattie\b/g, "patty"],
-    [/\bpatties\b/g, "patty"],
-    [/\bpatties\b/g, "patty"],
+    [/\bpatties\b/g, "patties"],
     [/\bpate\b/g, "patty"],
 
     [/\bwrp\b/g, "wrapper"],
@@ -588,6 +603,8 @@ function normalizeOCR(text) {
     [/\blonton\b/g, "wonton"],
     [/\bhonton\b/g, "wonton"],
 
+    [/\bodn\b/g, "hidden"],
+
     [/\bwiukun\b/g, "morningstar farms"],
     [/\bwi ukun\b/g, "morningstar farms"]
   ];
@@ -598,27 +615,21 @@ function normalizeOCR(text) {
   }
 
 
-  /*
-   * Remove obvious prices.
-   */
+  /* Remove prices */
 
   s = s.replace(/\$\s*\d+(?:[.,]\d{1,2})?/g, " ");
   s = s.replace(/\b\d+\.\d{2}\b/g, " ");
 
 
-  /*
-   * Remove isolated long numeric strings,
-   * which are usually UPCs / receipt numbers.
-   */
+  /* Remove UPC / long numbers */
 
   s = s.replace(/\b\d{5,}\b/g, " ");
 
 
-  /*
-   * Normalize punctuation.
-   */
+  /* Normalize punctuation */
 
   s = s.replace(/[^a-z0-9\s]/g, " ");
+
   s = s.replace(/\s+/g, " ").trim();
 
   return s;
@@ -626,7 +637,7 @@ function normalizeOCR(text) {
 
 
 /* ============================================================
-   LEVENSHTEIN DISTANCE
+   LEVENSHTEIN
    ============================================================ */
 
 function levenshtein(a, b) {
@@ -649,8 +660,12 @@ function levenshtein(a, b) {
     for (let j = 1; j <= a.length; j++) {
 
       if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
+
+        matrix[i][j] =
+          matrix[i - 1][j - 1];
+
       } else {
+
         matrix[i][j] = Math.min(
           matrix[i - 1][j - 1] + 1,
           matrix[i][j - 1] + 1,
@@ -665,7 +680,7 @@ function levenshtein(a, b) {
 
 
 /* ============================================================
-   STRING SIMILARITY
+   SIMILARITY
    ============================================================ */
 
 function similarity(a, b) {
@@ -673,34 +688,54 @@ function similarity(a, b) {
   a = normalizeOCR(a);
   b = normalizeOCR(b);
 
-  if (!a || !b) return 0;
+  if (!a || !b) {
+    return 0;
+  }
 
-  if (a === b) return 1;
+  if (a === b) {
+    return 1;
+  }
 
   if (a.includes(b) || b.includes(a)) {
-    return 0.92;
+    return 0.95;
   }
 
   const distance = levenshtein(a, b);
 
-  return 1 - distance / Math.max(a.length, b.length);
+  return 1 -
+    distance /
+    Math.max(a.length, b.length);
 }
 
 
 /* ============================================================
-   TOKEN OVERLAP
+   TOKEN SIMILARITY
    ============================================================ */
 
 function tokenOverlap(a, b) {
 
-  const aTokens = [...new Set(normalizeOCR(a).split(/\s+/).filter(Boolean))];
-  const bTokens = [...new Set(normalizeOCR(b).split(/\s+/).filter(Boolean))];
+  const aTokens =
+    [...new Set(
+      normalizeOCR(a)
+        .split(/\s+/)
+        .filter(Boolean)
+    )];
+
+  const bTokens =
+    [...new Set(
+      normalizeOCR(b)
+        .split(/\s+/)
+        .filter(Boolean)
+    )];
+
 
   if (!aTokens.length || !bTokens.length) {
     return 0;
   }
 
+
   let matches = 0;
+
 
   for (const aToken of aTokens) {
 
@@ -708,71 +743,123 @@ function tokenOverlap(a, b) {
 
     for (const bToken of bTokens) {
 
-      const sim = similarity(aToken, bToken);
+      const score =
+        similarity(aToken, bToken);
 
-      if (sim > best) {
-        best = sim;
+      if (score > best) {
+        best = score;
       }
     }
 
-    if (best >= 0.72) {
+    if (best >= 0.70) {
       matches++;
     }
   }
 
-  return matches / Math.max(aTokens.length, bTokens.length);
+
+  return matches /
+    Math.max(aTokens.length, bTokens.length);
 }
 
 
 /* ============================================================
-   FUZZY FAMILY SCORE
+   BEST SUBSTRING / WORD WINDOW
    ============================================================ */
 
-function fuzzyFamilyScore(ocrText, family) {
+function bestWindowScore(ocrText, alias) {
 
-  const normalizedOCR = normalizeOCR(ocrText);
+  const text =
+    normalizeOCR(ocrText);
 
-  let bestScore = 0;
+  const target =
+    normalizeOCR(alias);
 
-  for (const alias of family.aliases) {
 
-    const normalizedAlias = normalizeOCR(alias);
+  if (!text || !target) {
+    return 0;
+  }
 
-    const characterScore =
-      similarity(normalizedOCR, normalizedAlias);
 
-    const tokenScore =
-      tokenOverlap(normalizedOCR, normalizedAlias);
+  /*
+   * Direct containment is extremely strong evidence.
+   */
 
-    let substringScore = 0;
+  if (
+    text.includes(target) ||
+    target.includes(text)
+  ) {
+    return 0.98;
+  }
 
-    if (
-      normalizedOCR.includes(normalizedAlias) ||
-      normalizedAlias.includes(normalizedOCR)
+
+  const textWords =
+    text.split(/\s+/).filter(Boolean);
+
+  const targetWords =
+    target.split(/\s+/).filter(Boolean);
+
+
+  let best = 0;
+
+
+  /*
+   * Compare the alias against small
+   * windows inside the OCR line.
+   */
+
+  const minWindow =
+    Math.max(1, targetWords.length - 1);
+
+  const maxWindow =
+    Math.min(
+      textWords.length,
+      targetWords.length + 3
+    );
+
+
+  for (
+    let size = minWindow;
+    size <= maxWindow;
+    size++
+  ) {
+
+    for (
+      let start = 0;
+      start <= textWords.length - size;
+      start++
     ) {
-      substringScore = 0.95;
-    }
 
-    /*
-     * Combine the measures.
-     */
+      const window =
+        textWords
+          .slice(start, start + size)
+          .join(" ");
 
-    const score =
-      characterScore * 0.50 +
-      tokenScore * 0.30 +
-      substringScore * 0.20;
 
-    if (score > bestScore) {
-      bestScore = score;
+      const charScore =
+        similarity(window, target);
+
+      const tokenScore =
+        tokenOverlap(window, target);
+
+
+      const score =
+        charScore * 0.60 +
+        tokenScore * 0.40;
+
+
+      if (score > best) {
+        best = score;
+      }
     }
   }
 
-  return bestScore;
+
+  return best;
 }
 
 
 /* ============================================================
-   KNOWN FAMILY MATCHING
+   FAMILY MATCHING
    ============================================================ */
 
 function matchKnownFamily(text) {
@@ -780,32 +867,31 @@ function matchKnownFamily(text) {
   let bestFamily = null;
   let bestScore = 0;
 
+
   for (const family of PRODUCT_FAMILIES) {
 
-    const score = fuzzyFamilyScore(text, family);
+    for (const alias of family.aliases) {
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestFamily = family;
+      const score =
+        bestWindowScore(text, alias);
+
+
+      if (score > bestScore) {
+
+        bestScore = score;
+        bestFamily = family;
+      }
     }
   }
 
+
   /*
-   * Slightly lower threshold for short OCR strings,
-   * but require stronger evidence for very short strings.
+   * We now require only moderate confidence
+   * because we're comparing product-sized pieces
+   * of the OCR line rather than the whole line.
    */
 
-  const normalized = normalizeOCR(text);
-
-  let threshold = 0.57;
-
-  if (normalized.length < 8) {
-    threshold = 0.72;
-  } else if (normalized.length < 14) {
-    threshold = 0.63;
-  }
-
-  if (bestFamily && bestScore >= threshold) {
+  if (bestFamily && bestScore >= 0.68) {
 
     return {
       family: bestFamily,
@@ -813,117 +899,161 @@ function matchKnownFamily(text) {
     };
   }
 
+
   return null;
 }
 
 
 /* ============================================================
-   DEPARTMENT FILTER
+   NON-PRODUCT FILTER
    ============================================================ */
 
-function isDepartmentLine(text) {
+function isNonProductLine(text) {
 
-  const normalized = normalizeOCR(text);
+  const normalized =
+    normalizeOCR(text);
+
 
   if (!normalized) {
     return true;
   }
 
+
   /*
-   * Exact department/header lines.
+   * Exact / near-exact receipt footer terms.
    */
 
-  for (const department of DEPARTMENT_LINES) {
+  for (const term of NON_PRODUCT_TERMS) {
 
-    if (normalized === department) {
+    if (normalized === term) {
       return true;
     }
 
     if (
-      normalized.length < 30 &&
-      normalized.includes(department) &&
-      department.length >= 5
+      normalized.includes(term) &&
+      term.length >= 6
     ) {
       return true;
     }
   }
 
+
   /*
-   * Payment / transaction lines.
+   * Lines containing obvious tax language
+   * should never become grocery items.
    */
 
-  if (/^\d+\s*(cash|credit|debit)$/i.test(normalized)) {
+  if (
+    normalized.includes("tax") ||
+    normalized.includes("county") ||
+    normalized.includes("state") &&
+    normalized.includes("tax")
+  ) {
     return true;
   }
 
-  if (/^(item|items)\s+\d+$/i.test(normalized)) {
+
+  /*
+   * Payment lines.
+   */
+
+  if (
+    normalized.includes("credit") ||
+    normalized.includes("debit") ||
+    normalized.includes("card information")
+  ) {
     return true;
   }
+
+
+  /*
+   * Receipt closing text.
+   */
+
+  if (
+    normalized.includes("thank you") ||
+    normalized.includes("number of items")
+  ) {
+    return true;
+  }
+
 
   return false;
 }
 
 
 /* ============================================================
-   DETERMINE WHETHER UNMATCHED LINE LOOKS LIKE A GROCERY ITEM
+   PLAUSIBLE UNMATCHED GROCERY
    ============================================================ */
 
 function looksLikeUnmatchedGrocery(text) {
 
-  const normalized = normalizeOCR(text);
+  const normalized =
+    normalizeOCR(text);
+
 
   if (!normalized) {
     return false;
   }
 
-  if (isDepartmentLine(normalized)) {
+
+  if (isNonProductLine(normalized)) {
     return false;
   }
+
+
+  const letters =
+    (normalized.match(/[a-z]/g) || []).length;
+
+  const numbers =
+    (normalized.match(/[0-9]/g) || []).length;
+
+
+  if (letters < 4) {
+    return false;
+  }
+
 
   /*
-   * Very short OCR garbage is unlikely to be useful.
+   * Numeric-heavy receipt garbage.
    */
-
-  if (normalized.length < 4) {
-    return false;
-  }
-
-  /*
-   * Lines consisting almost entirely of numbers are not products.
-   */
-
-  const letters = (normalized.match(/[a-z]/g) || []).length;
-  const numbers = (normalized.match(/[0-9]/g) || []).length;
-
-  if (letters < 3) {
-    return false;
-  }
 
   if (numbers > letters * 2) {
     return false;
   }
 
+
   /*
-   * Explicit grocery vocabulary.
+   * Grocery vocabulary.
    */
 
-  const hasGroceryWord = GROCERY_WORDS.some(word =>
-    normalized.includes(word)
-  );
+  const hasGroceryWord =
+    GROCERY_WORDS.some(
+      word => normalized.includes(word)
+    );
+
 
   if (hasGroceryWord) {
     return true;
   }
 
+
   /*
-   * Lines with several alphabetic words are worth human review.
+   * A line containing several words
+   * may still be an unknown grocery item.
    */
 
-  const words = normalized.split(/\s+/).filter(Boolean);
+  const words =
+    normalized.split(/\s+/).filter(Boolean);
 
-  if (words.length >= 2 && letters >= 6) {
+
+  if (
+    words.length >= 2 &&
+    letters >= 8
+  ) {
     return true;
   }
+
 
   return false;
 }
@@ -935,33 +1065,32 @@ function looksLikeUnmatchedGrocery(text) {
 
 function cleanOCRLine(line) {
 
-  let text = String(line || "").trim();
+  let text =
+    String(line || "").trim();
 
-  /*
-   * Remove isolated receipt symbols.
-   */
 
-  text = text.replace(/[|¦]/g, " ");
+  text =
+    text.replace(/[|¦]/g, " ");
 
-  /*
-   * Remove leading / trailing junk.
-   */
 
-  text = text.replace(/^[^a-zA-Z0-9]+/, "");
-  text = text.replace(/[^a-zA-Z0-9]+$/, "");
+  text =
+    text.replace(/^[^a-zA-Z0-9]+/, "");
 
-  /*
-   * Collapse whitespace.
-   */
 
-  text = text.replace(/\s+/g, " ").trim();
+  text =
+    text.replace(/[^a-zA-Z0-9]+$/, "");
+
+
+  text =
+    text.replace(/\s+/g, " ").trim();
+
 
   return text;
 }
 
 
 /* ============================================================
-   FUZZY DUPLICATE CHECK
+   DUPLICATE CHECK
    ============================================================ */
 
 function isDuplicate(existingItems, candidate) {
@@ -969,39 +1098,47 @@ function isDuplicate(existingItems, candidate) {
   for (const existing of existingItems) {
 
     /*
-     * Known products with the same family are duplicates.
+     * Same recognized product family.
      */
 
     if (
       candidate.familyName &&
       existing.familyName &&
-      candidate.familyName === existing.familyName
+      candidate.familyName ===
+      existing.familyName
     ) {
       return true;
     }
 
+
     /*
-     * Unmatched lines can still be duplicate OCR readings.
+     * Fuzzy duplicate OCR lines.
      */
 
-    const sim = similarity(
-      candidate.rawText,
-      existing.rawText
-    );
+    const sim =
+      similarity(
+        candidate.rawText,
+        existing.rawText
+      );
 
-    if (sim >= 0.82) {
+
+    if (sim >= 0.78) {
       return true;
     }
 
-    const overlap = tokenOverlap(
-      candidate.rawText,
-      existing.rawText
-    );
 
-    if (overlap >= 0.75) {
+    const overlap =
+      tokenOverlap(
+        candidate.rawText,
+        existing.rawText
+      );
+
+
+    if (overlap >= 0.72) {
       return true;
     }
   }
+
 
   return false;
 }
@@ -1013,65 +1150,119 @@ function isDuplicate(existingItems, candidate) {
 
 function parseOCR(text) {
 
-  const lines = text
-    .split(/\r?\n/)
-    .map(cleanOCRLine)
-    .filter(Boolean);
+  const lines =
+    text
+      .split(/\r?\n/)
+      .map(cleanOCRLine)
+      .filter(Boolean);
+
 
   const items = [];
 
+
   for (const line of lines) {
 
-    if (isDepartmentLine(line)) {
+    /*
+     * FIRST: discard receipt footer /
+     * payment / tax / department lines.
+     */
+
+    if (isNonProductLine(line)) {
       continue;
     }
 
-    const known = matchKnownFamily(line);
+
+    /*
+     * SECOND: try to identify known product.
+     */
+
+    const known =
+      matchKnownFamily(line);
+
 
     if (known) {
 
       const item = {
+
         id: crypto.randomUUID(),
-        name: known.family.name,
-        familyName: known.family.name,
-        rawText: line,
-        confidence: "Confident",
-        shelfLife: known.family.shelfLife,
-        score: known.score,
-        checked: true
+
+        name:
+          known.family.name,
+
+        familyName:
+          known.family.name,
+
+        rawText:
+          line,
+
+        confidence:
+          "Confident",
+
+        shelfLife:
+          known.family.shelfLife,
+
+        score:
+          known.score,
+
+        checked:
+          true
       };
 
-      if (!isDuplicate(items, item)) {
+
+      if (
+        !isDuplicate(items, item)
+      ) {
         items.push(item);
       }
+
 
       continue;
     }
 
 
     /*
-     * If we can't confidently identify it,
-     * retain it only if it looks like a plausible grocery item.
+     * THIRD: retain plausible unknown grocery items.
      */
 
-    if (looksLikeUnmatchedGrocery(line)) {
+    if (
+      looksLikeUnmatchedGrocery(line)
+    ) {
 
       const item = {
+
         id: crypto.randomUUID(),
-        name: line,
-        familyName: null,
-        rawText: line,
-        confidence: "Needs review",
-        shelfLife: 7,
-        score: 0,
-        checked: true
+
+        name:
+          line,
+
+        familyName:
+          null,
+
+        rawText:
+          line,
+
+        confidence:
+          "Needs review",
+
+        shelfLife:
+          7,
+
+        score:
+          0,
+
+        checked:
+          true
       };
 
-      if (!isDuplicate(items, item)) {
+
+      if (
+        !isDuplicate(items, item)
+      ) {
         items.push(item);
       }
     }
   }
+
 
   return items;
 }
@@ -1083,60 +1274,98 @@ function parseOCR(text) {
 
 function estimatedDate(days) {
 
-  const date = new Date();
+  const date =
+    new Date();
 
-  date.setDate(date.getDate() + Number(days || 7));
 
-  return date.toISOString().split("T")[0];
+  date.setDate(
+    date.getDate() +
+    Number(days || 7)
+  );
+
+
+  return date
+    .toISOString()
+    .split("T")[0];
 }
 
 
 /* ============================================================
-   SCAN RECEIPT
+   SCAN
    ============================================================ */
 
 async function scanReceipt() {
 
-  const input = document.getElementById("receiptInput");
-  const progress = document.getElementById("progress");
+  const input =
+    document.getElementById(
+      "receiptInput"
+    );
 
-  if (!input.files || !input.files.length) {
+  const progress =
+    document.getElementById(
+      "progress"
+    );
 
-    progress.textContent = "Please choose a receipt photo first.";
+
+  if (
+    !input.files ||
+    !input.files.length
+  ) {
+
+    progress.textContent =
+      "Please choose a receipt photo first.";
 
     return;
   }
 
-  const file = input.files[0];
 
-  progress.textContent = "Reading receipt…";
+  const file =
+    input.files[0];
+
+
+  progress.textContent =
+    "Reading receipt…";
+
 
   try {
 
-    const result = await Tesseract.recognize(
-      file,
-      "eng",
-      {
-        logger: message => {
+    const result =
+      await Tesseract.recognize(
+        file,
+        "eng",
+        {
+          logger: message => {
 
-          if (message.status === "recognizing text") {
+            if (
+              message.status ===
+              "recognizing text"
+            ) {
 
-            const percent =
-              Math.round((message.progress || 0) * 100);
+              const percent =
+                Math.round(
+                  (message.progress || 0) *
+                  100
+                );
 
-            progress.textContent =
-              `Reading receipt… ${percent}%`;
+
+              progress.textContent =
+                `Reading receipt… ${percent}%`;
+            }
           }
         }
-      }
-    );
+      );
 
 
-    rawOCRText = result.data.text || "";
+    rawOCRText =
+      result.data.text || "";
 
-    currentReviewItems = parseOCR(rawOCRText);
+
+    currentReviewItems =
+      parseOCR(rawOCRText);
+
 
     renderReview();
+
 
     progress.textContent =
       `Scan complete. Found ${currentReviewItems.length} possible grocery items.`;
@@ -1147,7 +1376,6 @@ async function scanReceipt() {
 
     progress.textContent =
       "Sorry — the receipt could not be read.";
-
   }
 }
 
@@ -1159,29 +1387,42 @@ async function scanReceipt() {
 function renderReview() {
 
   const section =
-    document.getElementById("reviewSection");
+    document.getElementById(
+      "reviewSection"
+    );
 
   const list =
-    document.getElementById("reviewList");
+    document.getElementById(
+      "reviewList"
+    );
 
   const summary =
-    document.getElementById("reviewSummary");
+    document.getElementById(
+      "reviewSummary"
+    );
 
   const raw =
-    document.getElementById("rawOCR");
+    document.getElementById(
+      "rawOCR"
+    );
 
 
-  section.classList.remove("hidden");
+  section.classList.remove(
+    "hidden"
+  );
+
 
   summary.textContent =
-    `${currentReviewItems.length} possible grocery line${currentReviewItems.length === 1 ? "" : "s"} found. ` +
-    `Known products are matched automatically; uncertain items are marked Needs review.`;
+    `${currentReviewItems.length} possible grocery line${currentReviewItems.length === 1 ? "" : "s"} found. Known products are matched automatically; uncertain items are marked Needs review.`;
 
 
-  raw.textContent = rawOCRText;
+  raw.textContent =
+    rawOCRText;
 
 
-  if (!currentReviewItems.length) {
+  if (
+    !currentReviewItems.length
+  ) {
 
     list.innerHTML =
       `<div class="empty">
@@ -1195,77 +1436,89 @@ function renderReview() {
   list.innerHTML = "";
 
 
-  currentReviewItems.forEach((item, index) => {
+  currentReviewItems.forEach(
+    (item, index) => {
 
-    const container =
-      document.createElement("div");
-
-    container.className = "item";
-
-
-    const badgeClass =
-      item.confidence === "Confident"
-        ? "badge confident"
-        : "badge review";
+      const container =
+        document.createElement(
+          "div"
+        );
 
 
-    const date =
-      estimatedDate(item.shelfLife);
+      container.className =
+        "item";
 
 
-    container.innerHTML = `
+      const badgeClass =
+        item.confidence ===
+        "Confident"
+          ? "badge confident"
+          : "badge review";
 
-      <div class="item-header">
 
-        <input
-          type="checkbox"
-          id="check-${index}"
-          ${item.checked ? "checked" : ""}
-          onchange="toggleChecked(${index}, this.checked)"
-        >
+      const date =
+        item.estimatedDate ||
+        estimatedDate(
+          item.shelfLife
+        );
 
-        <div class="item-main">
 
-          <div class="${badgeClass}">
-            ${item.confidence}
-          </div>
+      container.innerHTML = `
 
-          <label>
-            Item name
-          </label>
+        <div class="item-header">
 
           <input
-            type="text"
-            value="${escapeHTML(item.name)}"
-            onchange="updateItemName(${index}, this.value)"
+            type="checkbox"
+            id="check-${index}"
+            ${item.checked ? "checked" : ""}
+            onchange="toggleChecked(${index}, this.checked)"
           >
 
-          <div style="margin-top:10px;">
+          <div class="item-main">
+
+            <div class="${badgeClass}">
+              ${item.confidence}
+            </div>
 
             <label>
-              Estimated use-by date
+              Item name
             </label>
 
             <input
-              type="date"
-              value="${date}"
-              onchange="updateItemDate(${index}, this.value)"
+              type="text"
+              value="${escapeHTML(item.name)}"
+              onchange="updateItemName(${index}, this.value)"
             >
 
-          </div>
+            <div style="margin-top:10px;">
 
-          <div class="ocr-text">
-            OCR: ${escapeHTML(item.rawText)}
+              <label>
+                Estimated use-by date
+              </label>
+
+              <input
+                type="date"
+                value="${date}"
+                onchange="updateItemDate(${index}, this.value)"
+              >
+
+            </div>
+
+            <div class="ocr-text">
+              OCR: ${escapeHTML(item.rawText)}
+            </div>
+
           </div>
 
         </div>
-
-      </div>
-    `;
+      `;
 
 
-    list.appendChild(container);
-  });
+      list.appendChild(
+        container
+      );
+    }
+  );
 }
 
 
@@ -1285,42 +1538,65 @@ function escapeHTML(value) {
 
 
 /* ============================================================
-   REVIEW EDITING
+   EDIT REVIEW
    ============================================================ */
 
-function toggleChecked(index, checked) {
+function toggleChecked(
+  index,
+  checked
+) {
 
-  if (currentReviewItems[index]) {
-    currentReviewItems[index].checked = checked;
+  if (
+    currentReviewItems[index]
+  ) {
+
+    currentReviewItems[index]
+      .checked = checked;
   }
 }
 
 
-function updateItemName(index, name) {
+function updateItemName(
+  index,
+  name
+) {
 
-  if (currentReviewItems[index]) {
-    currentReviewItems[index].name = name;
+  if (
+    currentReviewItems[index]
+  ) {
+
+    currentReviewItems[index]
+      .name = name;
   }
 }
 
 
-function updateItemDate(index, date) {
+function updateItemDate(
+  index,
+  date
+) {
 
-  if (currentReviewItems[index]) {
-    currentReviewItems[index].estimatedDate = date;
+  if (
+    currentReviewItems[index]
+  ) {
+
+    currentReviewItems[index]
+      .estimatedDate = date;
   }
 }
 
 
 /* ============================================================
-   CHECK / UNCHECK
+   CHECK / UNCHECK ALL
    ============================================================ */
 
 function checkAll() {
 
-  currentReviewItems.forEach(item => {
-    item.checked = true;
-  });
+  currentReviewItems.forEach(
+    item => {
+      item.checked = true;
+    }
+  );
 
   renderReview();
 }
@@ -1328,16 +1604,18 @@ function checkAll() {
 
 function uncheckAll() {
 
-  currentReviewItems.forEach(item => {
-    item.checked = false;
-  });
+  currentReviewItems.forEach(
+    item => {
+      item.checked = false;
+    }
+  );
 
   renderReview();
 }
 
 
 /* ============================================================
-   PANTRY STORAGE
+   PANTRY
    ============================================================ */
 
 function getPantry() {
@@ -1345,7 +1623,9 @@ function getPantry() {
   try {
 
     return JSON.parse(
-      localStorage.getItem("pantrypilot_pantry") || "[]"
+      localStorage.getItem(
+        "pantrypilot_pantry"
+      ) || "[]"
     );
 
   } catch {
@@ -1365,49 +1645,69 @@ function savePantry(pantry) {
 
 
 /* ============================================================
-   ADD TO PANTRY
+   ADD CHECKED ITEMS
    ============================================================ */
 
 function addCheckedToPantry() {
 
-  const pantry = getPantry();
+  const pantry =
+    getPantry();
+
 
   const checkedItems =
-    currentReviewItems.filter(item => item.checked);
+    currentReviewItems.filter(
+      item => item.checked
+    );
 
 
-  checkedItems.forEach(item => {
+  checkedItems.forEach(
+    item => {
 
-    const date =
-      item.estimatedDate ||
-      estimatedDate(item.shelfLife);
+      const date =
+        item.estimatedDate ||
+        estimatedDate(
+          item.shelfLife
+        );
 
 
-    pantry.push({
-      id: crypto.randomUUID(),
-      name: item.name,
-      addedDate: new Date().toISOString().split("T")[0],
-      estimatedDate: date,
-      rawOCR: item.rawText,
-      confidence: item.confidence
-    });
+      pantry.push({
 
-  });
+        id:
+          crypto.randomUUID(),
+
+        name:
+          item.name,
+
+        addedDate:
+          new Date()
+            .toISOString()
+            .split("T")[0],
+
+        estimatedDate:
+          date,
+
+        rawOCR:
+          item.rawText,
+
+        confidence:
+          item.confidence
+      });
+    }
+  );
 
 
   savePantry(pantry);
 
-  renderPantry();
 
+  renderPantry();
   renderUseSoon();
 
 
-  /*
-   * Remove added items from review.
-   */
-
   currentReviewItems =
-    currentReviewItems.filter(item => !item.checked);
+    currentReviewItems.filter(
+      item => !item.checked
+    );
+
 
   renderReview();
 }
@@ -1422,8 +1722,11 @@ function renderPantry() {
   const pantry =
     getPantry();
 
+
   const container =
-    document.getElementById("pantryList");
+    document.getElementById(
+      "pantryList"
+    );
 
 
   if (!pantry.length) {
@@ -1440,30 +1743,39 @@ function renderPantry() {
   container.innerHTML = "";
 
 
-  pantry.forEach(item => {
+  pantry.forEach(
+    item => {
 
-    const div =
-      document.createElement("div");
-
-    div.className = "pantry-item";
-
-
-    div.innerHTML = `
-
-      <strong>
-        ${escapeHTML(item.name)}
-      </strong>
-
-      <div class="muted">
-        Estimated use-by:
-        ${escapeHTML(item.estimatedDate)}
-      </div>
-
-    `;
+      const div =
+        document.createElement(
+          "div"
+        );
 
 
-    container.appendChild(div);
-  });
+      div.className =
+        "pantry-item";
+
+
+      div.innerHTML = `
+
+        <strong>
+          ${escapeHTML(item.name)}
+        </strong>
+
+        <div class="muted">
+          Estimated use-by:
+          ${escapeHTML(
+            item.estimatedDate
+          )}
+        </div>
+      `;
+
+
+      container.appendChild(
+        div
+      );
+    }
+  );
 }
 
 
@@ -1476,8 +1788,11 @@ function renderUseSoon() {
   const pantry =
     getPantry();
 
+
   const container =
-    document.getElementById("useSoonList");
+    document.getElementById(
+      "useSoonList"
+    );
 
 
   if (!pantry.length) {
@@ -1496,16 +1811,11 @@ function renderUseSoon() {
 
 
   const sorted =
-    [...pantry].sort((a, b) => {
-
-      const dateA =
-        new Date(a.estimatedDate);
-
-      const dateB =
-        new Date(b.estimatedDate);
-
-      return dateA - dateB;
-    });
+    [...pantry].sort(
+      (a, b) =>
+        new Date(a.estimatedDate) -
+        new Date(b.estimatedDate)
+    );
 
 
   const soon =
@@ -1515,59 +1825,81 @@ function renderUseSoon() {
   container.innerHTML = "";
 
 
-  soon.forEach(item => {
+  soon.forEach(
+    item => {
 
-    const date =
-      new Date(item.estimatedDate);
+      const date =
+        new Date(
+          item.estimatedDate
+        );
 
 
-    const diff =
-      Math.ceil(
-        (date - today) /
-        (1000 * 60 * 60 * 24)
+      const diff =
+        Math.ceil(
+          (date - today) /
+          (1000 * 60 * 60 * 24)
+        );
+
+
+      let timing = "";
+
+
+      if (diff < 0) {
+
+        timing =
+          "Past estimated date";
+
+      } else if (diff === 0) {
+
+        timing =
+          "Estimated date is today";
+
+      } else if (diff === 1) {
+
+        timing =
+          "About 1 day remaining";
+
+      } else {
+
+        timing =
+          `About ${diff} days remaining`;
+      }
+
+
+      const div =
+        document.createElement(
+          "div"
+        );
+
+
+      div.className =
+        "pantry-item";
+
+
+      div.innerHTML = `
+
+        <div class="soon">
+          ${escapeHTML(item.name)}
+        </div>
+
+        <div>
+          ${timing}
+        </div>
+
+        <div class="muted">
+          Estimated use-by:
+          ${escapeHTML(
+            item.estimatedDate
+          )}
+        </div>
+      `;
+
+
+      container.appendChild(
+        div
       );
-
-
-    const div =
-      document.createElement("div");
-
-    div.className = "pantry-item";
-
-
-    let timing = "";
-
-
-    if (diff < 0) {
-      timing = "Past estimated date";
-    } else if (diff === 0) {
-      timing = "Estimated date is today";
-    } else if (diff === 1) {
-      timing = "About 1 day remaining";
-    } else {
-      timing = `About ${diff} days remaining`;
     }
-
-
-    div.innerHTML = `
-
-      <div class="soon">
-        ${escapeHTML(item.name)}
-      </div>
-
-      <div>
-        ${timing}
-      </div>
-
-      <div class="muted">
-        Estimated use-by:
-        ${escapeHTML(item.estimatedDate)}
-      </div>
-
-    `;
-
-
-    container.appendChild(div);
-  });
+  );
 }
 
 
