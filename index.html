@@ -29,7 +29,7 @@ canvas{display:none}
 
 <div id="reviewCard" class="card hidden">
 <div class="row"><h2>Review items</h2><span id="count" class="badge"></span></div>
-<p class="small">Review the extracted lines before adding them to your pantry.</p>
+<p class="small">Receipt text is cleaned, normalized, and deduplicated before you add it.</p>
 <button class="secondary" onclick="setAll(true)">Check all</button>
 <button class="secondary" onclick="setAll(false)">Uncheck all</button>
 <div id="items"></div>
@@ -48,120 +48,449 @@ canvas{display:none}
 const shelfLife={
 "cheddar cheese":21,"cheese":21,"ranch dressing":30,"cilantro":7,"ginger beer":90,
 "beer":90,"diet coke":180,"wonton wrappers":7,"chicken patties":7,
-"veggie patties":7,"meatless crumbles":7,"burger":7
+"veggie patties":7,"meatless crumbles":7,"burger":14
 };
 let candidates=[],rawText="";
 
 function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
 function norm(s){return s.toUpperCase()
-.replace(/\bMORNINGSTAR\s+FARMS\b/g,"MORNINGSTAR FARMS").replace(/\bHDDN\b/g,"HIDDEN")
-.replace(/\bVLY\b/g,"VALLEY").replace(/\bGRDN\b/g,"GARDEN").replace(/\bVG\b/g,"VEGGIE")
+.replace(/\bMORNINGSTAR\s+FARMS\b/g,"MORNINGSTAR FARMS")
+.replace(/\bHDDN\b/g,"HIDDEN").replace(/\bVLY\b/g,"VALLEY")
+.replace(/\bGRDN\b/g,"GARDEN").replace(/\bVG\b/g,"VEGGIE")
 .replace(/\bPATT(?:Y|IES)?\b/g,"PATTIES").replace(/\bGRILLER[S]?\b/g,"GRILLERS")
 .replace(/\bCRMBL[S]?\b/g,"CRUMBLES").replace(/\bCHKN\b/g,"CHICKEN")
 .replace(/\bCIL\b/g,"CILANTRO").replace(/\bWTN\b/g,"WONTON")
 .replace(/\bWRP[S]?\b/g,"WRAPPERS").replace(/\s+/g," ").trim();}
 
-function score(s){
-let x=norm(s),n=0;
-["CHEESE","CHEDDAR","RANCH","CILANTRO","GINGER BEER","BEER","COKE","SODA","WONTON",
-"WRAPPER","CHICKEN","PATTIES","BURGER","CRUMBLES","VEGGIE","YOGURT","MILK","BREAD",
-"BUN","EGG","EGGS","APPLE","BANANA","LETTUCE","TOMATO","POTATO","ONION","GARLIC",
-"CARROT","CEREAL","PASTA","SAUCE","DRESSING","SOUP","FROZEN","ICE CREAM","CHIPS",
-"CRACKER","COFFEE","TEA","JUICE","WATER","MEAT","BEEF","PORK","TURKEY","FISH"]
-.forEach(k=>{if(x.includes(k))n+=k.length>5?4:3});
+function stripReceiptNoise(s){
+let x=norm(s);
+
+// Remove prices, common receipt codes, UPC-like numbers, and trailing receipt text.
+x=x.replace(/\$?\d+\.\d{2}\b/g," ")
+ .replace(/\b\d{8,14}\b/g," ")
+ .replace(/\b[A-Z0-9]{1,3}\d{4,}[A-Z0-9]*\b/gi," ")
+ .replace(/\b(?:TF|TX|TAX|FD|FOOD|ITEM|SKU|UPC|QTY)\b/gi," ")
+ .replace(/\s+/g," ").trim();
+
+x=x.replace(/^[^A-Z]+/i,"").trim();
+
+return x;
+}
+
+const keywords=[
+"CHEESE","CHEDDAR","RANCH","CILANTRO","GINGER BEER","BEER","COKE","SODA",
+"WONTON","WRAPPER","CHICKEN","PATTIES","BURGER","CRUMBLES","VEGGIE","YOGURT",
+"MILK","BREAD","BUN","EGG","EGGS","APPLE","BANANA","LETTUCE","TOMATO","POTATO",
+"ONION","GARLIC","CARROT","CEREAL","PASTA","SAUCE","DRESSING","SOUP","FROZEN",
+"ICE CREAM","CHIPS","CRACKER","COFFEE","TEA","JUICE","WATER","MEAT","BEEF",
+"PORK","TURKEY","FISH"
+];
+
+function productScore(s){
+let x=stripReceiptNoise(s),n=0;
+keywords.forEach(k=>{if(x.includes(k))n+=k.length>5?4:3});
 if(/\b\d+\s*(PK|PACK|CT|COUNT|OZ|LB|L|ML|GAL)\b/i.test(x))n+=2;
 return n;
 }
-function nonFood(s){
-let x=norm(s);
-return /^(SUBTOTAL|TOTAL|TAX|CHANGE|CASH|CREDIT|DEBIT|VISA|MASTERCARD|AMEX|DISCOVER|BALANCE|TENDER|PAYMENT|THANK|SAVINGS|COUPON|DISCOUNT|LOYALTY|MEMBER|REWARD|TRANSACTION|AUTH|APPROVAL|CARD|CASH BACK|FUEL|GAS|BAG FEE|BAG|QTY|PRICE|ITEM|DESCRIPTION|UPC|STORE|REGISTER|LANE|DATE|TIME)$/i.test(x)
-||/^[\d\s$.,%#*:+\-\/]+$/.test(x)||x.length<3;
+
+function obviousNonProduct(s){
+let x=stripReceiptNoise(s);
+
+return /^(SUBTOTAL|TOTAL|TAX|CHANGE|CASH|CREDIT|DEBIT|VISA|MASTERCARD|AMEX|DISCOVER|BALANCE|TENDER|PAYMENT|THANK|SAVINGS|COUPON|DISCOUNT|LOYALTY|MEMBER|REWARD|TRANSACTION|AUTH|APPROVAL|CARD|CASH BACK|FUEL|GAS|BAG FEE|BAG|FROZEN FOODS?|GROCERY|PRODUCE|DELI|BAKERY|MEAT|SEAFOOD)$/i.test(x)
+||/^(QTY|PRICE|ITEM|DESCRIPTION|UPC|STORE|REGISTER|LANE|DATE|TIME)$/i.test(x)
+||/^[\d\s$.,%#*:+\-\/]+$/.test(x)
+||x.length<3;
 }
-function clean(s){return s.replace(/[|¦]/g," ").replace(/\s+/g," ").replace(/^[^\w]+|[^\w).%-]+$/g,"").trim();}
-function plausible(s){let x=clean(s);return x&&!nonFood(x)&&score(x)>=3&&x.length>=4;}
+
+function plausible(s){
+let x=stripReceiptNoise(s);
+return x&&!obviousNonProduct(x)&&productScore(x)>=3&&x.length>=4;
+}
+
 function canonical(s){
-let x=norm(s).toLowerCase(),m=[
+let x=stripReceiptNoise(s).toLowerCase();
+
+const patterns=[
+[/medium.*cheddar|cheddar.*pbt/,"Medium Cheddar Cheese"],
 [/morningstar farms.*grillers.*burger/,"MorningStar Farms Grillers Burger"],
 [/morningstar farms.*garden.*veggie.*patties/,"MorningStar Farms Garden Veggie Patties"],
-[/meatless.*crumbles/,"Meatless Crumbles"],[/chicken.*patties/,"Chicken Patties"],
-[/medium.*cheddar/,"Medium Cheddar Cheese"],[/hidden.*valley.*ranch/,"Hidden Valley Ranch"],
-[/dill.*ranch.*dressing/,"Dill Ranch Dressing"],[/cilantro/,"Cilantro"],
-[/wonton.*wrapper/,"Wonton Wrappers"],[/fever.*tree.*ginger.*beer/,"Fever-Tree Ginger Beer"],
-[/diet.*coke/,"Diet Coke"]];
-for(const [r,v] of m)if(r.test(x))return v;return clean(s);
+[/meatless.*crumbles/,"Meatless Crumbles"],
+[/chicken.*patties/,"Chicken Patties"],
+[/hidden.*valley.*ranch/,"Hidden Valley Ranch"],
+[/dill.*ranch.*squeeze/,"Dill Ranch Dressing"],
+[/dill.*ranch.*dressing/,"Dill Ranch Dressing"],
+[/cilantro/,"Cilantro"],
+[/wonton.*wrapper/,"Wonton Wrappers"],
+[/fever.*tree.*ginger.*beer/,"Fever-Tree Ginger Beer"],
+[/diet.*coke/,"Diet Coke"],
+[/\bbeer\b/,"Beer"]
+];
+
+for(const [r,v] of patterns)
+if(r.test(x))return v;
+
+// Clean remaining line further for display.
+return x.replace(/\b(?:WH|LER|RGA|OY|CQ|FF|RI|GAD9|E|F)\b/gi," ")
+.replace(/\s+/g," ").trim()
+.replace(/\b\w\b/g,"")
+.replace(/\s+/g," ").trim()
+||cleanDisplay(s);
 }
-function estimate(name){let x=name.toLowerCase();for(const k in shelfLife)if(x.includes(k))return shelfLife[k];if(/fresh|produce|herb/.test(x))return 7;if(/frozen/.test(x))return 90;return 14;}
-function datePlus(days){let d=new Date();d.setDate(d.getDate()+days);return d.toISOString().slice(0,10);}
+
+function cleanDisplay(s){
+return stripReceiptNoise(s).replace(/\s+/g," ").trim();
+}
+
+function estimate(name){
+let x=name.toLowerCase();
+
+for(const k in shelfLife)
+if(x.includes(k))return shelfLife[k];
+
+if(/fresh|produce|herb/.test(x))return 7;
+if(/frozen/.test(x))return 90;
+
+return 14;
+}
+
+function datePlus(days){
+let d=new Date();
+d.setDate(d.getDate()+days);
+return d.toISOString().slice(0,10);
+}
 
 function preprocess(file,variant){
 return new Promise((resolve,reject)=>{
-const img=new Image();img.onload=()=>{
-const c=document.getElementById("work"),ctx=c.getContext("2d");
-const scale=Math.min(3,2400/Math.max(img.width,img.height));c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+const img=new Image();
+
+img.onload=()=>{
+const c=document.getElementById("work");
+const ctx=c.getContext("2d");
+
+const scale=Math.min(3,2400/Math.max(img.width,img.height));
+
+c.width=Math.round(img.width*scale);
+c.height=Math.round(img.height*scale);
+
 ctx.drawImage(img,0,0,c.width,c.height);
-const id=ctx.getImageData(0,0,c.width,c.height),d=id.data;
+
+const id=ctx.getImageData(0,0,c.width,c.height);
+const d=id.data;
+
 for(let i=0;i<d.length;i+=4){
 let g=.299*d[i]+.587*d[i+1]+.114*d[i+2];
-if(variant==="bw")g=g>175?255:0;
-else if(variant==="contrast")g=Math.max(0,Math.min(255,(g-128)*1.8+128));
+
+if(variant==="bw")
+g=g>175?255:0;
+
+else if(variant==="contrast")
+g=Math.max(0,Math.min(255,(g-128)*1.8+128));
+
 d[i]=d[i+1]=d[i+2]=g;
 }
-ctx.putImageData(id,0,0);resolve(c.toDataURL("image/png"));
-};img.onerror=reject;img.src=URL.createObjectURL(file);
+
+ctx.putImageData(id,0,0);
+resolve(c.toDataURL("image/png"));
+};
+
+img.onerror=reject;
+img.src=URL.createObjectURL(file);
 });
 }
 
 async function doOCR(image,psm){
-const r=await Tesseract.recognize(image,"eng",{config:{tessedit_pageseg_mode:String(psm)},logger:m=>{
-if(m.status)document.getElementById("status").textContent=m.status;
-}});
+const r=await Tesseract.recognize(
+image,
+"eng",
+{config:{tessedit_pageseg_mode:String(psm)}}
+);
+
 return r.data.text||"";
 }
+
 async function scan(){
-const f=document.getElementById("file").files[0];if(!f){alert("Choose a receipt photo first.");return;}
-const status=document.getElementById("status"),p=document.getElementById("progress");p.classList.remove("hidden");p.value=5;
+
+const f=document.getElementById("file").files[0];
+
+if(!f){
+alert("Choose a receipt photo first.");
+return;
+}
+
+const status=document.getElementById("status");
+const p=document.getElementById("progress");
+
+p.classList.remove("hidden");
+p.value=5;
+
 try{
+
 status.textContent="Preparing receipt image…";
-const images=[await preprocess(f,"normal"),await preprocess(f,"contrast"),await preprocess(f,"bw")];
+
+const imgs=[
+await preprocess(f,"normal"),
+await preprocess(f,"contrast"),
+await preprocess(f,"bw")
+];
+
 let texts=[];
-for(let i=0;i<images.length;i++){status.textContent=`Reading receipt version ${i+1} of 3…`;p.value=15+i*25;texts.push(await doOCR(images[i],6));}
-rawText=texts.join("\\n\\n--- OCR PASS ---\\n\\n");
-candidates=parseOCR(texts);p.value=100;render();
+
+for(let i=0;i<imgs.length;i++){
+
+status.textContent=`Reading receipt version ${i+1} of 3…`;
+p.value=15+i*25;
+
+texts.push(await doOCR(imgs[i],6));
+}
+
+rawText=texts.join("\n\n--- OCR PASS ---\n\n");
+
+candidates=parseOCR(texts);
+
+p.value=100;
+
+render();
+
 status.textContent=`Found ${candidates.length} plausible grocery lines.`;
-}catch(e){console.error(e);status.textContent="Scan failed. Try a clearer, closer photo.";alert("Scan failed.");}
+
+}catch(e){
+
+console.error(e);
+
+status.textContent="Scan failed. Try a clearer, closer photo.";
+
+alert("Scan failed.");
+
 }
+}
+
 function parseOCR(texts){
-const out=[],seen=new Set();
+
+const out=[];
+const seen=new Set();
+
 for(const text of texts){
+
 for(const line0 of text.split(/\r?\n/)){
-const line=clean(line0);if(!plausible(line))continue;
-const name=canonical(line),key=name.toLowerCase();if(seen.has(key))continue;seen.add(key);
-out.push({raw:line,name,checked:true,confidence:score(line)>=7?"Confident":"Needs review",days:estimate(name)});
-}}
-const joined=texts.join(" ").replace(/\s+/g," ");
-const known=["Medium Cheddar Cheese","MorningStar Farms Grillers Burger","Meatless Crumbles",
-"Chicken Patties","MorningStar Farms Garden Veggie Patties","Fever-Tree Ginger Beer",
-"Beer","Diet Coke","Hidden Valley Ranch","Cilantro","Dill Ranch Dressing","Wonton Wrappers"];
-for(const k of known){
-const re=new RegExp(k.split(" ").map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("\\s+"),"i");
-if(re.test(joined)){let key=k.toLowerCase();if(!seen.has(key)){seen.add(key);out.push({raw:k,name:k,checked:true,confidence:"Confident",days:estimate(k)});}}
+
+const cleaned=stripReceiptNoise(line0);
+
+if(!plausible(cleaned))
+continue;
+
+const name=canonical(cleaned);
+const key=name.toLowerCase();
+
+if(!name||seen.has(key))
+continue;
+
+seen.add(key);
+
+out.push({
+raw:cleaned,
+name,
+checked:true,
+confidence:productScore(cleaned)>=7?"Confident":"Needs review",
+days:estimate(name)
+});
+
 }
+}
+
+const joined=texts.join(" ").replace(/\s+/g," ");
+
+const known=[
+"Medium Cheddar Cheese",
+"MorningStar Farms Grillers Burger",
+"Meatless Crumbles",
+"Chicken Patties",
+"MorningStar Farms Garden Veggie Patties",
+"Fever-Tree Ginger Beer",
+"Beer",
+"Diet Coke",
+"Hidden Valley Ranch",
+"Cilantro",
+"Dill Ranch Dressing",
+"Wonton Wrappers"
+];
+
+for(const k of known){
+
+const re=new RegExp(
+k.split(" ")
+.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))
+.join("\\s+"),
+"i"
+);
+
+if(re.test(joined)){
+
+let key=k.toLowerCase();
+
+if(!seen.has(key)){
+
+seen.add(key);
+
+out.push({
+raw:k,
+name:k,
+checked:true,
+confidence:"Confident",
+days:estimate(k)
+});
+
+}
+}
+}
+
 return out;
 }
+
 function render(){
-document.getElementById("reviewCard").classList.remove("hidden");document.getElementById("count").textContent=candidates.length+" lines";document.getElementById("raw").textContent=rawText;
-const box=document.getElementById("items");box.innerHTML="";
-candidates.forEach((it,i)=>{let d=document.createElement("div");d.className="item "+(it.confidence==="Needs review"?"needs":"");
-d.innerHTML=`<div class="row"><label><input type="checkbox" ${it.checked?"checked":""} onchange="candidates[${i}].checked=this.checked"></label>
-<input value="${esc(it.name)}" onchange="candidates[${i}].name=this.value"><span class="badge">${it.confidence}</span></div>
-<div class="row"><span class="small">Estimated date</span><input type="date" value="${it.date||datePlus(it.days)}" onchange="candidates[${i}].date=this.value"></div>
-<div class="small">OCR: ${esc(it.raw)}</div>`;box.appendChild(d);});
+
+document.getElementById("reviewCard").classList.remove("hidden");
+
+document.getElementById("count").textContent=
+candidates.length+" lines";
+
+document.getElementById("raw").textContent=rawText;
+
+const box=document.getElementById("items");
+
+box.innerHTML="";
+
+candidates.forEach((it,i)=>{
+
+let d=document.createElement("div");
+
+d.className=
+"item "+(it.confidence==="Needs review"?"needs":"");
+
+d.innerHTML=`
+<div class="row">
+<label>
+<input type="checkbox"
+${it.checked?"checked":""}
+onchange="candidates[${i}].checked=this.checked">
+</label>
+
+<input
+value="${esc(it.name)}"
+onchange="candidates[${i}].name=this.value">
+
+<span class="badge">
+${it.confidence}
+</span>
+</div>
+
+<div class="row">
+<span class="small">Estimated date</span>
+
+<input
+type="date"
+value="${it.date||datePlus(it.days)}"
+onchange="candidates[${i}].date=this.value">
+</div>
+
+<div class="small">
+OCR: ${esc(it.raw)}
+</div>
+`;
+
+box.appendChild(d);
+
+});
 }
-function setAll(v){candidates.forEach(x=>x.checked=v);render();}
-function addSelected(){let p=JSON.parse(localStorage.getItem("pantrypilot")||"[]");candidates.filter(x=>x.checked).forEach(x=>p.push({name:x.name,date:x.date||datePlus(x.days),added:new Date().toISOString()}));localStorage.setItem("pantrypilot",JSON.stringify(p));renderPantry();alert("Checked items added to pantry.");}
-function renderPantry(){let p=JSON.parse(localStorage.getItem("pantrypilot")||"[]");document.getElementById("pantryCount").textContent=p.length+" items";let b=document.getElementById("pantry");b.innerHTML="";
-if(!p.length){b.innerHTML='<p class="small">No items yet.</p>';return;}p.sort((a,b)=>(a.date||"").localeCompare(b.date||""));p.forEach((x,i)=>{let d=document.createElement("div");d.className="item";d.innerHTML=`<div class="row"><strong>${esc(x.name)}</strong><span class="small">${esc(x.date||"")}</span><button class="secondary" onclick="removeItem(${i})">Remove</button></div>`;b.appendChild(d);});}
-function removeItem(i){let p=JSON.parse(localStorage.getItem("pantrypilot")||"[]");p.splice(i,1);localStorage.setItem("pantrypilot",JSON.stringify(p));renderPantry();}
+
+function setAll(v){
+candidates.forEach(x=>x.checked=v);
+render();
+}
+
+function addSelected(){
+
+let p=
+JSON.parse(localStorage.getItem("pantrypilot")||"[]");
+
+candidates
+.filter(x=>x.checked)
+.forEach(x=>
+p.push({
+name:x.name,
+date:x.date||datePlus(x.days),
+added:new Date().toISOString()
+})
+);
+
+localStorage.setItem("pantrypilot",JSON.stringify(p));
+
+renderPantry();
+
+alert("Checked items added to pantry.");
+}
+
+function renderPantry(){
+
+let p=
+JSON.parse(localStorage.getItem("pantrypilot")||"[]");
+
+document.getElementById("pantryCount").textContent=
+p.length+" items";
+
+let b=document.getElementById("pantry");
+
+b.innerHTML="";
+
+if(!p.length){
+
+b.innerHTML=
+'<p class="small">No items yet.</p>';
+
+return;
+}
+
+p.sort((a,b)=>
+(a.date||"").localeCompare(b.date||"")
+);
+
+p.forEach((x,i)=>{
+
+let d=document.createElement("div");
+
+d.className="item";
+
+d.innerHTML=`
+<div class="row">
+<strong>${esc(x.name)}</strong>
+<span class="small">${esc(x.date||"")}</span>
+<button class="secondary"
+onclick="removeItem(${i})">
+Remove
+</button>
+</div>
+`;
+
+b.appendChild(d);
+
+});
+}
+
+function removeItem(i){
+
+let p=
+JSON.parse(localStorage.getItem("pantrypilot")||"[]");
+
+p.splice(i,1);
+
+localStorage.setItem(
+"pantrypilot",
+JSON.stringify(p)
+);
+
+renderPantry();
+}
+
 renderPantry();
 </script>
 </body>
